@@ -10,8 +10,7 @@ if __name__ == "__main__":
 
     for banca, url in BANCAS.items():
         print(f"\n📂 Processando banca: {banca}")
-        html = scraper.fetch(url)
-        provas = scraper.extrair_exams(html)
+        provas = scraper.extrair_todas_provas(url)
 
         print(f"Total de provas encontradas: {len(provas)}")
         for prova in provas[:3]:

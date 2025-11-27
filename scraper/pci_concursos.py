@@ -64,3 +64,16 @@ class PciConcursos:
         html = self.fetch(prova.url)
         prova.download = self.extrair_downloads(html)
         return prova
+
+    def extrair_todas_provas(self, base_url: str) -> list[Prova]:
+        todas_provas = []
+        pagina = 1
+        while True:
+            url = base_url if pagina == 1 else f"{base_url}/{pagina}"
+            html = self.fetch(url)
+            provas = self.extrair_exams(html)
+            if not provas:
+                break
+            todas_provas.extend(provas)
+            pagina += 1
+        return todas_provas
