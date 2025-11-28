@@ -1,6 +1,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
+*.pyc
 *.so
 .Python
 build/
@@ -85,3 +86,5 @@ __marimo__/
 .pdm-python
 .pdm-build/
 .pixi
+.idea/
+.vscode/
