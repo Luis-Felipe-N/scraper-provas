@@ -1,3 +1,3 @@
-from src.services.pdf_extractor import PdfExtractor, PdfContent
+from src.services.pdf_extractor import AnswerKey, PdfContent, PdfExtractor, PdfImage
 
-__all__ = ["PdfExtractor", "PdfContent"]
+__all__ = ["PdfExtractor", "PdfContent", "PdfImage", "AnswerKey"]

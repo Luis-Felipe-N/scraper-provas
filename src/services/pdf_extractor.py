@@ -1,6 +1,6 @@
 import io
+import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 import aiohttp
 from PIL import Image
@@ -15,6 +15,13 @@ class PdfImage:
     height: int
     data: bytes
     format: str
+
+
+@dataclass
+class AnswerKey:
+    exam_name: str
+    tipo: str
+    answers: dict[int, str]
 
 
 @dataclass
@@ -84,8 +91,6 @@ class PdfExtractor:
         return self.extract_text(pdf_bytes, extract_images)
 
     def extract_questions(self, text: str) -> list[dict]:
-        import re
-
         questions = []
         pattern = r"(?:^|\n)\s*(\d{1,3})\s*\n"
         matches = list(re.finditer(pattern, text))
@@ -102,7 +107,8 @@ class PdfExtractor:
             seen_numbers.add(num)
 
             start = match.start()
-            end = matches[i + 1].start() if i + 1 < len(matches) else min(start + 3000, len(text))
+            end = matches[i + 1].start() if i + \
+                1 < len(matches) else min(start + 3000, len(text))
             question_text = text[start:end].strip()
 
             if len(question_text) < 50:
@@ -117,3 +123,55 @@ class PdfExtractor:
 
         questions.sort(key=lambda q: q["number"])
         return questions
+
+    def extract_answer_keys(self, text: str) -> list[AnswerKey]:
+        text = re.sub(r"pcimarkpci\s*\w+", "", text)
+        text = re.sub(r"\s+", " ", text)
+
+        answer_keys = []
+        pattern = r"([A-Za-zÀ-ÿº\s]+(?:Militar|Bombeiro|Polícia|Civil|Perito|Tenente|Soldado|Oficial|Agente)[^–\-]*)[–\-]\s*Tipo\s*(\d+)"
+        blocks = list(re.finditer(pattern, text, re.IGNORECASE))
+
+        for i, match in enumerate(blocks):
+            exam_name = match.group(1).strip()
+            exam_name = re.sub(r"^(GABARITO\s*(DEFINITIVO|PRELIMINAR|OFICIAL)?\s*)", "", exam_name, flags=re.IGNORECASE).strip()
+            exam_name = re.sub(r"^\d*º?\s*", "", exam_name).strip()
+            tipo = match.group(2).strip()
+
+            start = match.end()
+            end = blocks[i + 1].start() if i + 1 < len(blocks) else len(text)
+            block_text = text[start:end]
+
+            numbers = re.findall(r"\b(\d{1,3})\b", block_text)
+            letters = re.findall(r"\b([A-E])\b", block_text)
+
+            answers = {}
+            expected_questions = []
+            for num in numbers:
+                n = int(num)
+                if 1 <= n <= 200:
+                    expected_questions.append(n)
+
+            expected_questions = sorted(set(expected_questions))
+
+            if len(letters) >= len(expected_questions):
+                for idx, q_num in enumerate(expected_questions):
+                    if idx < len(letters):
+                        answers[q_num] = letters[idx]
+
+            if answers:
+                answer_keys.append(
+                    AnswerKey(
+                        exam_name=exam_name,
+                        tipo=tipo,
+                        answers=answers,
+                    )
+                )
+
+        return answer_keys
+
+    async def extract_answer_keys_from_url(
+        self, session: aiohttp.ClientSession, url: str
+    ) -> list[AnswerKey]:
+        pdf_content = await self.extract_from_url(session, url)
+        return self.extract_answer_keys(pdf_content.text)
