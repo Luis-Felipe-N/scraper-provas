@@ -1,14 +1,11 @@
 import asyncio
-
 import aiohttp
-
 from questions.models import Question, Exam
 from src.scrapers import PciConcursosScraper
 from src.services import PdfExtractor
 
 
 async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
-    """Scrape exams from a specific banca and save to database."""
     scraper = PciConcursosScraper()
     extractor = PdfExtractor()
 
@@ -26,7 +23,7 @@ async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
             exam_count = 0
 
             async for exam_data in scraper.scrape_all(base_url):
-                print(f"Processing exam: {exam_data}")
+                print(f"Processing exam: {exam_data.name}")
                 if exam_count >= max_exams:
                     break
 
@@ -37,14 +34,13 @@ async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
                         exam_count += 1
                         continue
 
-                    # Parse year as integer
                     try:
                         year = int(exam_data.year) if exam_data.year else 2024
                     except (ValueError, TypeError):
                         year = 2024
 
-                    # Create or get exam
-                    exam_obj, created = Exam.objects.get_or_create(
+                    # [CORREÇÃO] Uso de aget_or_create (nativo Django 5)
+                    exam_obj, created = await Exam.objects.aget_or_create(
                         page_url=exam_data.page_url,
                         defaults={
                             'name': exam_data.name,
@@ -60,26 +56,21 @@ async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
 
                     result['total_exams'] += 1
 
-                    # Extract questions and answers if both URLs available
                     if exam_data.download.exam_url and exam_data.download.answer_key_url:
                         try:
-                            # Extract questions from exam PDF
                             pdf_content = await extractor.extract_from_url(
                                 session, exam_data.download.exam_url
                             )
                             questions_data = extractor.extract_questions(
                                 pdf_content.text)
 
-                            # Extract answer keys
                             answer_keys = await extractor.extract_answer_keys_from_url(
                                 session, exam_data.download.answer_key_url
                             )
 
-                            answer_map = {}
-                            if answer_keys:
-                                answer_map = answer_keys[0].answers
+                            answer_map = answer_keys[0].answers if answer_keys else {
+                            }
 
-                            # Save questions
                             for q_data in questions_data:
                                 q_num = q_data['number']
                                 correct_answer = answer_map.get(q_num, '')
@@ -87,7 +78,8 @@ async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
                                 if not correct_answer:
                                     continue
 
-                                question, q_created = Question.objects.get_or_create(
+                                # [CORREÇÃO] aget_or_create para questões
+                                question, q_created = await Question.objects.aget_or_create(
                                     banca=banca.upper(),
                                     year=year,
                                     number=q_num,
@@ -103,21 +95,22 @@ async def scrape_banca_task(banca: str, max_exams: int = 10) -> dict:
                                 )
 
                                 if q_created:
-                                    exam_obj.questions.add(question)
+                                    # [CORREÇÃO] aadd para relacionamento ManyToMany
+                                    await exam_obj.questions.aadd(question)
                                     result['total_questions'] += 1
 
                         except Exception as e:
                             result['errors'].append(
-                                f"Error extracting from {exam_data.name}: {str(e)}")
+                                f"Erro na extração de {exam_data.name}: {e}")
 
                 except Exception as e:
                     result['errors'].append(
-                        f"Error processing {exam_data.name}: {str(e)}")
+                        f"Erro ao processar prova {exam_data.name}: {e}")
 
                 exam_count += 1
                 await asyncio.sleep(0.5)
 
     except Exception as e:
-        result['errors'].append(f"Scraping error: {str(e)}")
+        result['errors'].append(f"Erro fatal no scraping: {str(e)}")
 
     return result

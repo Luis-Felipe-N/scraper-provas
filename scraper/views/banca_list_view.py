@@ -1,13 +1,10 @@
-import asyncio
 from typing import ClassVar
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter
-from rest_framework import status
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .tasks import scrape_banca_task
-from .serializers import BancaSerializer, ScrapeRequestSerializer, ScrapeResultSerializer
+from scraper.serializers import BancaSerializer
 
 
 class BancaListView(APIView):
@@ -44,29 +41,3 @@ class BancaListView(APIView):
     def get_valid_bancas(cls) -> list[str]:
         """Retorna lista de IDs de bancas válidas."""
         return [b['id'].upper() for b in cls.AVAILABLE_BANCAS]
-
-
-class ScrapeStatusView(APIView):
-    """
-    View para verificar o status do último scraping executado.
-    """
-
-    # Status compartilhado (em produção, usar Redis ou banco de dados)
-    _last_result: ClassVar[dict | None] = None
-
-    @extend_schema(
-        summary="Status do scraping",
-        description="Retorna o status do último scraping executado.",
-        tags=["Scraper"],
-        responses={200: ScrapeResultSerializer},
-    )
-    def get(self, request):
-        """Retorna o status do último scraping executado."""
-        if self._last_result is None:
-            return Response(
-                {'message': 'Nenhum scraping foi executado ainda.'},
-                status=status.HTTP_204_NO_CONTENT,
-            )
-
-        serializer = ScrapeResultSerializer(self._last_result)
-        return Response(serializer.data)
