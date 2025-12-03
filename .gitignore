@@ -88,3 +88,6 @@ __marimo__/
 .pixi
 .idea/
 .vscode/
+
+# Docker
+postgres_data/

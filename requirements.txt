@@ -1,7 +1,20 @@
+# Web Scraping
 aiohttp>=3.9.0
 beautifulsoup4>=4.12.0
 tenacity>=8.2.0
+
+# PDF Processing
+pypdf>=4.0.0
+pillow>=10.0.0
+
+# Django
+django>=5.0.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+django-filter>=23.5
+psycopg2-binary>=2.9.0
+
+# Configuration
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
-pypdf>=4.0.0
